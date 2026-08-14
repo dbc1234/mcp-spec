@@ -1,0 +1,83 @@
+name: mcp-spec
+description: Run MCP server conformance and behavior tests, and fail the build on errors.
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  command:
+    description: Server command to run over stdio, e.g. `node dist/index.js`. Mutually exclusive with `url`.
+    required: false
+  url:
+    description: Streamable HTTP endpoint of an already-running server. Mutually exclusive with `command`.
+    required: false
+  config:
+    description: Path to an mcp.test.yaml. Used when neither `command` nor `url` is given.
+    required: false
+  conformance:
+    description: strict | recommended | off
+    required: false
+  budget:
+    description: Fail when tool definitions exceed this token estimate.
+    required: false
+  version:
+    description: npm version range of mcp-spec to run.
+    required: false
+    default: latest
+  report:
+    description: Path to write a JUnit XML report to. Empty disables it.
+    required: false
+    default: mcp-spec.xml
+
+outputs:
+  report:
+    description: Path of the JUnit report, if one was written.
+    value: ${{ inputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run mcp-spec
+      shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_CONFORMANCE: ${{ inputs.conformance }}
+        INPUT_BUDGET: ${{ inputs.budget }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_REPORT: ${{ inputs.report }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "$INPUT_COMMAND" ] && [ -n "$INPUT_URL" ]; then
+          echo '::error::set either command or url, not both'
+          exit 2
+        fi
+
+        args=()
+        [ -n "$INPUT_CONFIG" ] && args+=(--config "$INPUT_CONFIG")
+        [ -n "$INPUT_CONFORMANCE" ] && args+=(--conformance "$INPUT_CONFORMANCE")
+        [ -n "$INPUT_BUDGET" ] && args+=(--budget "$INPUT_BUDGET")
+        [ -n "$INPUT_URL" ] && args+=(--url "$INPUT_URL")
+
+        # The pretty report goes to the log; the JUnit file is written in a
+        # second pass so both are available without re-running the server twice
+        # in the common (passing) case.
+        status=0
+        if [ -n "$INPUT_COMMAND" ]; then
+          npx --yes "mcp-spec@$INPUT_VERSION" "${args[@]}" -- $INPUT_COMMAND || status=$?
+        else
+          npx --yes "mcp-spec@$INPUT_VERSION" "${args[@]}" || status=$?
+        fi
+
+        if [ -n "$INPUT_REPORT" ]; then
+          report_args=("${args[@]}" --reporter junit --out "$INPUT_REPORT")
+          if [ -n "$INPUT_COMMAND" ]; then
+            npx --yes "mcp-spec@$INPUT_VERSION" "${report_args[@]}" -- $INPUT_COMMAND || true
+          else
+            npx --yes "mcp-spec@$INPUT_VERSION" "${report_args[@]}" || true
+          fi
+        fi
+
+        exit $status

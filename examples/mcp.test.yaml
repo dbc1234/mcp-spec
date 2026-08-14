@@ -1,0 +1,35 @@
+# Runs against demo-server.mjs — `npm run selftest`.
+# Relative paths resolve against this file's directory, not the shell's cwd.
+server:
+  command: node
+  args: [demo-server.mjs]
+
+conformance: recommended
+contextBudget: 4000
+
+tests:
+  - name: echo returns the message unchanged
+    tool: echo
+    input:
+      message: hello from mcp-spec
+    expect:
+      isError: false
+      content.0.type: text
+      content.0.text: hello from mcp-spec
+
+  - name: add sums its arguments
+    tool: add
+    input: { a: 2, b: 40 }
+    expect:
+      content.0.text: "42"
+
+  - name: echo rejects a non-string message
+    tool: echo
+    input: { message: 123 }
+    expectError: must be a string
+
+  - name: the readme resource is readable
+    resource: demo://readme
+    expect:
+      contents.0.mimeType: text/plain
+      contents.0.text: { contains: mcp-spec }
