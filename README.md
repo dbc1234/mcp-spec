@@ -183,7 +183,7 @@ Rules that need a capability the server doesn't declare are skipped, not failed.
 ### GitHub Actions
 
 ```yaml
-- uses: actions/setup-node@v4
+- uses: actions/setup-node@v5
   with:
     node-version: 20
 - run: npm ci && npm run build

@@ -38,8 +38,17 @@ export async function run(config: Config): Promise<RunResult> {
       serverInfo: session.client.getServerVersion(),
       startupMs: session.startupMs,
       transportErrors: session.transportErrors,
-      junkLines: session.junkLines(),
-      stderr: session.stderr(),
+      // Live rather than snapshotted. stdout and stderr are separate pipes
+      // with no ordering guarantee against the response that triggered them,
+      // so a server that logs inside its `tools/list` handler can have its
+      // response processed before the log data event fires. Snapshotting here
+      // silently loses whatever is still in flight.
+      get junkLines() {
+        return session.junkLines();
+      },
+      get stderr() {
+        return session.stderr();
+      },
       contextBudget: config.contextBudget,
       startupBudget: config.startupBudget ?? 5000,
     };
@@ -50,9 +59,18 @@ export async function run(config: Config): Promise<RunResult> {
     let evaluated = 0;
     let passed = 0;
 
+    let drained = false;
     for (const rule of allRules) {
       const severity = resolveSeverity(rule, profile, config.rules);
       if (severity === "off") continue;
+
+      // The hygiene rules read the output streams, so they run once everything
+      // else has finished talking to the server — and only after giving the
+      // pipes a beat to deliver whatever the last request produced.
+      if (rule.category === "hygiene" && !drained) {
+        drained = true;
+        await drainPipes();
+      }
       // A rule that needs a primitive the server does not offer is skipped
       // rather than failed — an absent capability is a legitimate design.
       if (rule.requires && !capabilities?.[rule.requires]) continue;
@@ -187,6 +205,15 @@ async function listAll<T>(client: Client, kind: "tools" | "resources" | "prompts
     if (!cursor) break;
   }
   return items;
+}
+
+/**
+ * Yields long enough for pending stdout/stderr `data` events to be delivered.
+ * Bounded and paid once per run — the live accessors on `RuleContext` do the
+ * real work; this just closes the window on the very last request.
+ */
+function drainPipes(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
