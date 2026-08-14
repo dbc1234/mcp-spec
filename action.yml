@@ -21,9 +21,9 @@ inputs:
     description: Fail when tool definitions exceed this token estimate.
     required: false
   version:
-    description: npm version range of mcp-spec to run.
+    description: Git ref of mcp-spec to run — a tag, branch or commit sha.
     required: false
-    default: latest
+    default: main
   report:
     description: Path to write a JUnit XML report to. Empty disables it.
     required: false
@@ -55,28 +55,39 @@ runs:
           exit 2
         fi
 
+        # `if` rather than `[ ... ] && ...`: under `set -e` a trailing false
+        # test is itself a failing command, so an empty optional input would
+        # abort the whole step.
         args=()
-        [ -n "$INPUT_CONFIG" ] && args+=(--config "$INPUT_CONFIG")
-        [ -n "$INPUT_CONFORMANCE" ] && args+=(--conformance "$INPUT_CONFORMANCE")
-        [ -n "$INPUT_BUDGET" ] && args+=(--budget "$INPUT_BUDGET")
-        [ -n "$INPUT_URL" ] && args+=(--url "$INPUT_URL")
+        if [ -n "$INPUT_CONFIG" ]; then args+=(--config "$INPUT_CONFIG"); fi
+        if [ -n "$INPUT_CONFORMANCE" ]; then args+=(--conformance "$INPUT_CONFORMANCE"); fi
+        if [ -n "$INPUT_BUDGET" ]; then args+=(--budget "$INPUT_BUDGET"); fi
+        if [ -n "$INPUT_URL" ]; then args+=(--url "$INPUT_URL"); fi
+
+        # Installed from git rather than npm. The package's `prepare` script
+        # builds it on install, so this needs no published artifact — install
+        # once here instead of letting each npx call re-clone.
+        spec="github:dbc1234/mcp-spec#$INPUT_VERSION"
+        tmp="$(mktemp -d)"
+        npm install --prefix "$tmp" --no-save --silent "$spec"
+        cli="$tmp/node_modules/.bin/mcp-spec"
 
         # The pretty report goes to the log; the JUnit file is written in a
         # second pass so both are available without re-running the server twice
         # in the common (passing) case.
         status=0
         if [ -n "$INPUT_COMMAND" ]; then
-          npx --yes "mcp-spec@$INPUT_VERSION" "${args[@]}" -- $INPUT_COMMAND || status=$?
+          "$cli" "${args[@]}" -- $INPUT_COMMAND || status=$?
         else
-          npx --yes "mcp-spec@$INPUT_VERSION" "${args[@]}" || status=$?
+          "$cli" "${args[@]}" || status=$?
         fi
 
         if [ -n "$INPUT_REPORT" ]; then
           report_args=("${args[@]}" --reporter junit --out "$INPUT_REPORT")
           if [ -n "$INPUT_COMMAND" ]; then
-            npx --yes "mcp-spec@$INPUT_VERSION" "${report_args[@]}" -- $INPUT_COMMAND || true
+            "$cli" "${report_args[@]}" -- $INPUT_COMMAND || true
           else
-            npx --yes "mcp-spec@$INPUT_VERSION" "${report_args[@]}" || true
+            "$cli" "${report_args[@]}" || true
           fi
         fi
 

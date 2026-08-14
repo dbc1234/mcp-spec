@@ -10,3 +10,6 @@ First release.
 - `pretty`, `json` and `junit` reporters; CI-friendly exit codes.
 - Reads raw protocol responses rather than SDK-validated ones, so malformed payloads are reported instead of crashing the run.
 - Ships its own stdio transport that surfaces non-JSON-RPC stdout writes, which the SDK's read buffer discards silently.
+
+Distributed from git (`npm install github:dbc1234/mcp-spec`); the `prepare`
+script builds the package on install, so no published artifact is required.

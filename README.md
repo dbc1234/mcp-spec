@@ -1,14 +1,13 @@
 # mcp-spec
 
-[![npm](https://img.shields.io/npm/v/mcp-spec.svg)](https://www.npmjs.com/package/mcp-spec)
 [![CI](https://github.com/dbc1234/mcp-spec/actions/workflows/ci.yml/badge.svg)](https://github.com/dbc1234/mcp-spec/actions/workflows/ci.yml)
-[![node](https://img.shields.io/node/v/mcp-spec.svg)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/mcp-spec.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
+[![license](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 **Conformance and behavior testing for MCP servers.** Point it at your server, get a pass/fail report, wire it into CI.
 
 ```bash
-npx mcp-spec -- node dist/index.js
+npx github:dbc1234/mcp-spec -- node dist/index.js
 ```
 
 ```
@@ -48,9 +47,13 @@ It also sees things a normal client cannot:
 
 ## Install
 
+Not on npm yet — install straight from this repo:
+
 ```bash
-npm install --save-dev mcp-spec
+npm install --save-dev github:dbc1234/mcp-spec
 ```
+
+The package builds itself on install, so no extra step is needed. Pin a tag if you want reproducible CI: `github:dbc1234/mcp-spec#v0.1.0`.
 
 Node 20 or newer. Works against any MCP server in any language — it talks the protocol, not your runtime.
 
@@ -59,11 +62,11 @@ Node 20 or newer. Works against any MCP server in any language — it talks the 
 Run against a server without any config:
 
 ```bash
-npx mcp-spec -- python -m my_server        # stdio
-npx mcp-spec --url https://example.com/mcp # streamable http
+npx github:dbc1234/mcp-spec -- python -m my_server        # stdio
+npx github:dbc1234/mcp-spec --url https://example.com/mcp # streamable http
 ```
 
-Or commit a config and run it bare:
+Once it's a dev dependency, the local binary is just `mcp-spec`:
 
 ```bash
 npx mcp-spec init   # writes mcp.test.yaml
@@ -193,7 +196,7 @@ Rules that need a capability the server doesn't declare are skipped, not failed.
 Or just call the CLI and let your existing reporter pick it up:
 
 ```yaml
-- run: npx mcp-spec --reporter junit --out mcp-spec.xml
+- run: npx github:dbc1234/mcp-spec --reporter junit --out mcp-spec.xml
 ```
 
 ### Exit codes

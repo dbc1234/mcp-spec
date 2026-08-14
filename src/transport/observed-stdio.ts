@@ -113,11 +113,35 @@ export class ObservedStdioTransport implements Transport {
     const child = this.child;
     this.child = undefined;
     if (!child) return;
-    child.stdin.end();
-    // Give the server a beat to exit on its own before insisting.
-    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
-    const timer = setTimeout(() => child.kill(), 1000);
-    await exited.finally(() => clearTimeout(timer));
+
+    // If the child is already gone, `exit` has fired and will never fire
+    // again, so waiting on it would hang forever. The window between `exit`
+    // and the `close` event that clears `this.child` is narrow and depends on
+    // machine load, which is exactly how this shows up: an intermittent
+    // cross-platform CI failure rather than a reproducible one.
+    if (child.exitCode === null && child.signalCode === null) {
+      try {
+        child.stdin.end();
+      } catch {
+        // stdin can already be destroyed if the server died mid-request.
+      }
+      await new Promise<void>((resolve) => {
+        const finish = () => {
+          clearTimeout(polite);
+          clearTimeout(insistent);
+          resolve();
+        };
+        child.once("exit", finish);
+        // Give the server a beat to exit on its own, then insist — and stop
+        // waiting either way. `close()` must never be the thing that hangs a
+        // run, because every code path ends in it.
+        const polite = setTimeout(() => child.kill("SIGTERM"), 1000);
+        const insistent = setTimeout(() => {
+          child.kill("SIGKILL");
+          finish();
+        }, 3000);
+      });
+    }
     this.onclose?.();
   }
 }
